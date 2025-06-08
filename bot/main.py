@@ -12,6 +12,7 @@ TOKEN = config.get("BOT_TOKEN")
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+
 # Хранилище для thread_id и истории сообщений каждого пользователя
 user_data = {}
 
@@ -193,3 +194,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Bot stopped.")
+
