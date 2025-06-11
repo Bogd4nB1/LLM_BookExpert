@@ -1,5 +1,35 @@
 import requests # type: ignore
 import json
+from googlesearch import search # type: ignore
+from typing import List
+import warnings
+
+def search_google(query: str, site: str = "wildberries.ru", status: bool = None) -> List[str]:
+    """
+    Выполняет поиск в Google и возвращает список URL-адресов.
+    
+    Args:
+        query: Поисковый запрос
+        site: Ограничить поиск конкретным сайтом (например 'github.com')
+        num_results: Количество возвращаемых результатов
+        
+    Returns:
+        Список URL-адресов с результатами поиска
+    """
+    if status:
+        full_query = f"Купить книгу {query} site:{site}" if site else query
+    else:
+        full_query = f"{query} site:{site}" if site else query
+
+    
+    # Подавляем предупреждения о возможных блокировках Google
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        try:
+            return list(search(full_query, num_results=5))
+        except Exception as e:
+            print(f"Ошибка поиска: {e}")
+            return []
 
 class GoogleBooksUniversalSearch:
     def __init__(self):

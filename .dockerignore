@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.env  # Исключаем .env из образа (безопасность!)
+Dockerfile
+docker-compose.yml

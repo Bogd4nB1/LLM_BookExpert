@@ -1,123 +1,128 @@
-import time
-from typing import Dict
-from dotenv import dotenv_values
-from langchain_gigachat.chat_models import GigaChat
-from langchain_core.tools import tool
-from langgraph.prebuilt import create_react_agent
-from langgraph.checkpoint.memory import MemorySaver
-from database.data import stuff_database
+import asyncio
+from dotenv import dotenv_values # type: ignore
+from aiogram import Bot, Dispatcher, F # type: ignore
+from aiogram.filters import Command # type: ignore
+from aiogram.types import Message # type: ignore
+from llm.agent_llm import agent_llm
+from llm.agent_sberbank import agent_sberbank
+from middleware.check_is_group import AccessMiddleware 
 
-memory = MemorySaver()
+config_dotenv = dotenv_values(".env")
 
-config = dotenv_values(".env")
+TOKEN = config_dotenv.get("BOT_TOKEN")
+CORPORATE_CHAT_ID = config_dotenv.get("CORPORATE_CHAT_ID")
 
-model = GigaChat(
-    credentials=config.get("GIGACHAT_KEY"),
-    scope=config.get("GIGACHAT_SCOPE"),
-    model=config.get("GIGACHAT_MODEL"),
-    verify_ssl_certs=False,
-)
+bot = Bot(token=TOKEN)
+dp = Dispatcher()
+dp.update.middleware(AccessMiddleware(CORPORATE_CHAT_ID))
 
-system_prompt = '''Ты бот-продавец книг. Твоя задача продать книги пользователю, 
-            получив от него заказ. 
-            Если тебе не хватает каких-то данных, запрашивай их у пользователя.'''
+# Хранилище для thread_id и истории сообщений каждого пользователя
+user_data = {}
 
+@dp.message(Command("start"))
+async def command_start_handler(message: Message) -> None:
+    user_data[message.from_user.id] = {
+        "thread_id": f"{message.from_user.id}_{int(message.date.timestamp())}",
+        "last_message_id": message.message_id,
+        "agent_type": "default"
+    }
+    await message.answer(
+        "📚 Привет! Я бот-помощник по подбору книг.\n\n"
+        "Доступные команды:\n"
+        "/start - перезапустить бота\n"
+        "/new - начать новый диалог (обычный агент)\n"
+        "/sber_new - начать новый диалог (Sberbank агент)\n"
+        "/help - справка по использованию"
+    )
 
-@tool
-def get_all_book_names() -> str:
-    """Возвращает названия моделей всех телефонов ф формате json"""
-    # Подсвечивает вызов функции зеленым цветом
-    print("\033[92m" + "Bot requested get_all_book_names()" + "\033[0m")
-    return ", ".join([stuff["name"] for stuff in stuff_database])
+@dp.message(Command("help"))
+async def help_handler(message: Message) -> None:
+    await message.answer(
+        "ℹ️ Справка по использованию бота:\n\n"
+        "/start - перезапустить бота\n"
+        "/new - начать новый диалог с обычным агентом\n"
+        "/sber_new - начать новый диалог с Sberbank агентом\n"
+        "/help - показать эту справку\n\n"
+        "Просто напишите мне, что вы ищете, и я помогу найти подходящие книги!"
+    )
 
-@tool
-def get_books_by_tags(tags: str) -> Dict:
-    """
-    Возвращает книги по тегам.
-    """
-    print("\033[92m" + f"Bot requested get_book_by_tags({tags})" + "\033[0m")
-    tags = tags.split(", ")
-    for stuff in stuff_database:
-        for tag in tags:
-            if tag in stuff["tags"]:
-                return stuff
-
-    return {"error": "Книга с таким тегом не найдена"}
-
+@dp.message(Command("new"))
+async def new_dialog_handler(message: Message) -> None:
+    thread_id = f"{message.from_user.id}_{int(message.date.timestamp())}"
+    user_data[message.from_user.id] = {
+        "thread_id": thread_id,
+        "last_message_id": message.message_id,
+        "agent_type": "default"
+    }
     
+    await message.answer("✅ Начат новый диалог с обычным агентом. Теперь вы можете отправлять свои запросы для поиска книг.")
 
-@tool
-def get_book_data_by_name(name: str) -> Dict:
-    """
-    Возвращает цену в долларах, характеристики и описание телефона по точному названию модели.
+@dp.message(Command("sber_new"))
+async def new_sber_dialog_handler(message: Message) -> None:
+    thread_id = f"{message.from_user.id}_{int(message.date.timestamp())}"
+    user_data[message.from_user.id] = {
+        "thread_id": thread_id,
+        "last_message_id": message.message_id,
+        "agent_type": "sberbank"
+    }
+    
+    await message.answer("✅ Начат новый диалог с Sberbank агентом. Теперь вы можете отправлять свои запросы для поиска книг в библиотеке Sberbank.")
 
-    Args:
-        name (str): Точное название книги.
-
-    Returns:
-        Dict: Словарь с информацией о книге (цена, название и описание).
-    """
-    # Подсвечивает вызов функции зеленым цветом
-    print("\033[92m" + f"Bot requested get_book_data_by_name({name})" + "\033[0m")
-    for stuff in stuff_database:
-        if stuff["name"] == name.strip():
-            return stuff
-
-    return {"error": "Книга с таким названием не найдена"}
-
-@tool
-def get_book_reviews(name: str) -> Dict:
-    """
-    Возвращает отзывы о книге.
-
-    Args:
-        name (str): Название книги.
-
-    Returns:
-        Dict: Словарь с информацией о книге (цена, название и описание).
-    """
-    # Подсвечивает вызов функции зеленым цветом
-    print("\033[92m" + f"Bot requested get_book_reviews({name})" + "\033[0m")
-    for stuff in stuff_database:
-        if stuff["name"] == name.strip():
-            return stuff["reviews"]
-
-    return {"error": "Книга с таким названием не найдена"}
-
-@tool
-def create_order(name: str, phone: str) -> None:
-    """
-    Создает новый заказ на книгу.
-
-    Args:
-        name (str): Название книги.
-        phone (str): Телефонный номер пользователя.
-
-    Returns:
-        str: Статус заказа.
-    """
-    # Подсвечивает вызов функции зеленым цветом
-    print("\033[92m" + f"Bot requested create_order({name}, {phone})" + "\033[0m")
-    print(f"!!! NEW ORDER !!! {name} {phone}")
-
-tools = [create_order, get_book_data_by_name,get_all_book_names, get_book_reviews, get_books_by_tags]
-agent = create_react_agent(model,
-                           tools=tools,
-                           checkpointer=MemorySaver(),
-                           prompt=system_prompt)
-
-def chat(thread_id: str):
+@dp.message(F.text)
+async def handle_message(message: Message) -> None:
+    # Игнорируем текстовые сообщения, которые являются командами
+    if message.text.lower() in ["/start", "/new", "/sber_new", "/help"]:
+        return
+    
+    user_id = message.from_user.id
+    
+    # Если у пользователя нет активной сессии, создаем новую с обычным агентом
+    if user_id not in user_data:
+        thread_id = f"{user_id}_{int(message.date.timestamp())}"
+        user_data[user_id] = {
+            "thread_id": thread_id,
+            "last_message_id": message.message_id,
+            "agent_type": "default"
+        }
+        await message.answer("ℹ️ Автоматически начат новый диалог с обычным агентом.")
+    
+    # Обновляем ID последнего сообщения
+    user_data[user_id]["last_message_id"] = message.message_id
+    
+    thread_id = user_data[user_id]["thread_id"]
     config = {"configurable": {"thread_id": thread_id}}
-    while(True):
-        rq = input("\n\033[36m[Human]: \033[0m")
-        if rq == "":
-            break
-        resp = agent.invoke({"messages": [("user", rq)]}, config=config)
-        print("\n\033[35m[Assistant]: \033[0m", resp["messages"][-1].content)
-        time.sleep(1) # For notebook capability
+    agent_type = user_data[user_id].get("agent_type", "default")
+    
+    try:
+        # Отправляем "Печатает..." как статус
+        await bot.send_chat_action(message.chat.id, "typing")
+        
+        # Вызываем соответствующий агент в зависимости от типа
+        if agent_type == "sberbank":
+            resp = agent_sberbank(message.text, config)
+        else:
+            resp = agent_llm(message.text, config)
+        
+        # Отправляем ответ пользователю
+        try:
+            sent_msg = await message.answer(resp, parse_mode="Markdown")
+        except:
+            # Если Markdown разметка некорректна, отправляем как обычный текст
+            sent_msg = await message.answer(resp)
+        user_data[user_id]["last_message_id"] = sent_msg.message_id
+        
+    except Exception as e:
+        error_msg = await message.answer(f"Произошла ошибка: {str(e)}")
+        user_data[user_id]["last_message_id"] = error_msg.message_id
+        # В случае ошибки создаем новую сессию
+        user_data[user_id]["thread_id"] = f"{user_id}_{int(message.date.timestamp())}"
 
-def main():
-    chat("123456")
+async def main():
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    main()
+    try:
+        print("Bot is running...")
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped.")
