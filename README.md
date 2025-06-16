@@ -8,7 +8,7 @@
 
 - **Backend**: Python + aiogram
 - **LLM**: GigaChat-2 (Sberbank AI)
-- **Веб-поиск**: Парсинг книжных магазинов
+- **Веб-поиск**: Парсинг API книжных магазинов
 
 ## 🚀 Запуск проекта
 
@@ -22,19 +22,26 @@ git clone https://github.com/Bogd4nB1/LLM_BookExpert.git
 cd LLM_BookExpert
 ```
 
-3. Установите зависимости (для uv):
-```bash
-uv sync
-```
-
-4. Создайте файл `.env` с вашими учетными данными:
+3. Создайте файл `.env` с вашими учетными данными:
 ```env
 GIGACHAT_API_KEY=ваш_api_ключ
 GIGACHAT_SCOPE=GIGACHAT_API_PERS
-GIGACHAT_MODEL=GigaChat-2-Pro
+GIGACHAT_MODEL=модель_llm
+BOT_TOKEN=token
+DB=postgresql://<username>:<password>@postgres:5432/bookexpert?sslmode=disable
+POSTGRES_PASSWORD=
+POSTGRES_DB=
+CORPORATE_CHAT_ID="id канала или группы"
 ```
 
-5. Запустите фалй:
+4. Соберите образ:
 ```bash
-uv run main.py
+docker compose build
 ```
+
+5. Запуск:
+```bash
+docker compose up
+```
+
+

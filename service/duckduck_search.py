@@ -47,3 +47,5 @@ def duckduckgo_search(
     except Exception as e:
         # В случае ошибки возвращаем JSON с описанием ошибки
         return json.dumps({"error": str(e)}, ensure_ascii=False, indent=json_indent)
+    
+
