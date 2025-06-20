@@ -36,6 +36,7 @@ BOT_TOKEN=token
 DB=postgresql://<username>:<password>@postgres:5432/bookexpert?sslmode=disable
 POSTGRES_PASSWORD=
 POSTGRES_DB=
+POSTGRES_USER=
 CORPORATE_CHAT_ID="id канала или группы"
 ```
 

@@ -90,7 +90,7 @@ async def handle_message(message: Message) -> None:
     user_data[user_id]["last_message_id"] = message.message_id
     
     thread_id = user_data[user_id]["thread_id"]
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {"configurable": {"thread_id": thread_id, "recursion_limit": 10}}
     agent_type = user_data[user_id].get("agent_type", "default")
     
     try:
